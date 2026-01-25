@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Prototype Tests</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .pass {
+            color: green;
+            margin: 5px 0;
+        }
+
+        .fail {
+            color: red;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .hidden-mock {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Running Tests...</h1>
+
+    <!-- Mocks for DOM elements required by app.js -->
+    <div class="hidden-mock">
+        <video id="video"></video>
+        <button id="login-btn"></button>
+        <div id="status-message"></div>
+        <div id="camera-overlay"></div>
+        <div id="login-view"></div>
+        <div id="dashboard-view"></div>
+        <span id="user-name"></span>
+        <span id="user-balance"></span>
+        <ul id="transaction-list"></ul>
+        <div class="camera-container"></div>
+        <button id="logout-btn"></button>
+    </div>
+
+    <!-- Test Setup -->
+    <script>
+        window.IS_TEST_ENV = true;
+
+        // Mock face-api.js
+        const faceapi = {
+            nets: {
+                tinyFaceDetector: { loadFromUri: () => Promise.resolve() },
+                faceLandmark68Net: { loadFromUri: () => Promise.resolve() },
+                faceRecognitionNet: { loadFromUri: () => Promise.resolve() }
+            },
+            generateFaceDescriptor: () => new Float32Array(128).fill(0), // Mock helper
+            euclideanDistance: (a, b) => {
+                // Simple Euclidean distance implementation
+                if (a.length !== b.length) return 1.0;
+                let sum = 0;
+                for (let i = 0; i < a.length; i++) {
+                    const diff = a[i] - b[i];
+                    sum += diff * diff;
+                }
+                return Math.sqrt(sum);
+            }
+        };
+    </script>
+
+    <!-- Load Application Code -->
+    <script src="app.js"></script>
+
+    <!-- Run Tests -->
+    <script>
+        function runTests() {
+            const results = document.createElement('div');
+            document.body.appendChild(results);
+
+            function assert(condition, message) {
+                const div = document.createElement('div');
+                if (condition) {
+                    div.textContent = '✅ PASS: ' + message;
+                    div.className = 'pass';
+                    console.log('PASS:', message);
+                } else {
+                    div.textContent = '❌ FAIL: ' + message;
+                    div.className = 'fail';
+                    console.error('FAIL:', message);
+                }
+                results.appendChild(div);
+                return condition;
+            }
+
+            try {
+                // Test 1: Verify USERS data
+                assert(Array.isArray(USERS), 'USERS array exists');
+                assert(USERS.length === 2, 'USERS has 2 entries');
+                assert(USERS[0].name === 'Alex Mercer', 'User 1 is Alex Mercer');
+                assert(USERS[1].name === 'Sarah Jenkins', 'User 2 is Sarah Jenkins');
+
+                // Test 2: Verify Logic (findBestMatch)
+                // We need to inject descriptors since we aren't running real face detection
+                const desc1 = new Float32Array(128).fill(0.1);
+                const desc2 = new Float32Array(128).fill(0.9);
+
+                USERS[0].descriptor = desc1;
+                USERS[1].descriptor = desc2;
+
+                // Exact match (distance 0)
+                const match1 = findBestMatch(desc1);
+                assert(match1 && match1.name === 'Alex Mercer', 'findBestMatch finds exact match for User 1');
+
+                // Near match (distance small)
+                const desc1Near = new Float32Array(128).fill(0.12); // diff 0.02 * 0.02 * 128 ... sqrt
+                // 0.02^2 = 0.0004 * 128 = 0.0512. sqrt(0.0512) ~= 0.226. Threshold is 0.6. Should pass.
+                const match1Near = findBestMatch(desc1Near);
+                assert(match1Near && match1Near.name === 'Alex Mercer', 'findBestMatch finds near match for User 1');
+
+                // No match (distance large)
+                const descFar = new Float32Array(128).fill(0.5);
+                // Distance to 0.1: 0.4 diff -> 0.16 * 128 = 20.48. sqrt(20) > 4.  Threshold 0.6. Fail.
+                const matchFar = findBestMatch(descFar);
+                assert(matchFar === null, 'findBestMatch returns null for unknown face');
+
+                // Test 3: Verify Dashboard Logic (mocking DOM)
+                // We can check if showDashboard updates tge DOM elements in our hidden mock
+                const user = USERS[0];
+                showDashboard(user);
+
+                const nameEl = document.getElementById('user-name');
+                const balanceEl = document.getElementById('user-balance');
+
+                assert(nameEl.innerText === 'Alex Mercer', 'showDashboard updates user name');
+                assert(balanceEl.innerText === 'R 18,540.00', 'showDashboard updates balance');
+
+                // Test 4: Local Storage Persistence
+                const testUser = {
+                    id: 'test_user',
+                    name: 'Test Setup',
+                    descriptor: new Float32Array(128).fill(0.5),
+                    transactions: []
+                };
+
+                // Mock localStorage
+                const mockStorage = {};
+                const originalSetItem = localStorage.setItem;
+                const originalGetItem = localStorage.getItem;
+
+                localStorage.setItem = (key, val) => { mockStorage[key] = val; };
+                localStorage.getItem = (key) => mockStorage[key] || null;
+
+                const storedArr = [
+                    { ...testUser, descriptor: Array.from(testUser.descriptor) }
+                ];
+                localStorage.setItem('securebank_users', JSON.stringify(storedArr));
+
+                // Test loadStoredUsers (we need to expose it or just test effect on USERS)
+                // Since loadStoredUsers is internal, we can't call it easily unless we modify app.js to expose it 
+                // OR we can trust the integration test.
+                // However, for this test suite, let's verify our helper functions logic if possible, 
+                // or just verify the storage logic we wrote in app.js by simulating the flow if we can.
+                // Actually, let's just verify the data transformation logic if we can access it? No, not valid.
+
+                // Let's verify the `serializeDescriptor` logic if we could, but we can't access it.
+                // Instead, let's simple verify that IF we add a user to USERS and save, it matches expectation.
+                // But wait, we can't access `serializeDescriptor` unless it's global. It IS global in app.js current state!
+
+                assert(typeof serializeDescriptor === 'function', 'serializeDescriptor exists');
+                const serialized = serializeDescriptor(testUser.descriptor);
+                assert(Array.isArray(serialized), 'serializeDescriptor returns Array');
+                assert(serialized.length === 128, 'serialized length is 128');
+
+                // Restore storage
+                localStorage.setItem = originalSetItem;
+                localStorage.getItem = originalGetItem;
+
+                // Final Summary
+                const summary = document.createElement('h2');
+                summary.textContent = 'All Tests Completed';
+                document.body.appendChild(summary);
+
+            } catch (err) {
+                const div = document.createElement('div');
+                div.textContent = '❌ CRITICAL ERROR: ' + err.message;
+                div.className = 'fail';
+                results.appendChild(div);
+            }
+        }
+
+        // Run immediately
+        runTests();
+    </script>
+</body>
+
+</html>

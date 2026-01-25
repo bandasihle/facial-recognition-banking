@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureBank Prototype</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Load face-api.js -->
+    <script src="face-api.min.js"></script>
+    <script src="app.js" defer></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Login View -->
+        <section id="login-view" class="view active">
+            <header>
+                <h1>SecureBank</h1>
+                <p class="subtitle">Next Gen Facial Security</p>
+            </header>
+
+            <div class="camera-container">
+                <video id="video" width="640" height="480" autoplay muted></video>
+                <div class="overlay" id="camera-overlay">
+                    <div class="scanner-line"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <p id="status-message" class="status">Initializing face models...</p>
+                <button id="login-btn" class="btn primary" disabled>Login with Face</button>
+                <button id="go-to-register-btn" class="btn text-btn">Sign Up</button>
+            </div>
+
+            <footer>
+                <p class="disclaimer">
+                    ⚠️ Demo: Synthetic biometric data only. No real customer info stored.
+                </p>
+            </footer>
+        </section>
+
+        <!-- Register View -->
+        <section id="register-view" class="view hidden">
+            <header>
+                <h1>SecureBank</h1>
+                <p class="subtitle">New User Registration</p>
+            </header>
+
+            <div class="camera-container">
+                <!-- We will reuse the video element by moving it or just having another placeholder if needed. 
+                     However, the simplest way is to reuse the video element if it's outside the sections, 
+                     but currently it's inside login-view. 
+                     Refactoring: I will move the video OUT of the views so it can be shared, 
+                     OR I will just clone the structure and manage the stream. 
+                     
+                     Better approach for this prototype: 
+                     Let's keep it simple. I will just add a placeholder div for the camera in the register view 
+                     and we will append the video element to whichever view is active in JS.
+                -->
+                <div id="register-camera-placeholder"></div>
+                <div class="overlay">
+                    <div class="scanner-line"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <input type="text" id="reg-name" placeholder="Enter Full Name" class="input-field">
+                <p id="reg-status-message" class="status">Position face to register</p>
+                <div class="btn-group">
+                    <button id="register-btn" class="btn primary">Capture & Register</button>
+                    <button id="back-to-login-btn" class="btn secondary">Back to Login</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard View -->
+        <section id="dashboard-view" class="view hidden">
+            <div id="atm-root" style="width: 100%; height: 100%;"></div>
+        </section>
+    </div>
+
+    <!-- React & Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- ATM Interface -->
+    <script type="text/babel" src="atm.jsx"></script>
+</body>
+
+</html>
